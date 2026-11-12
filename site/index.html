@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Globo de Notícias</title>
+<style>
+:root{--bg:#f3f5f7;--panel:#fff;--ink:#14202b;--mute:#5d6b78;--line:#d9e0e6;--chip:#e8edf1;--acc:#0b6b63;--up:#0a7d4f;--down:#b3372b;--sea:#0b1d3a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1220;--panel:#101b2d;--ink:#e6edf3;--mute:#8fa1b3;--line:#1f2f46;--chip:#18273d;--acc:#4fd1c0;--up:#4ade9b;--down:#ff7a6b}}
+:root[data-theme="dark"]{--bg:#0a1220;--panel:#101b2d;--ink:#e6edf3;--mute:#8fa1b3;--line:#1f2f46;--chip:#18273d;--acc:#4fd1c0;--up:#4ade9b;--down:#ff7a6b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:14px 18px 8px}
+h1{font:600 22px/1.2 Georgia,"Times New Roman",serif;margin:0}
+.sub{color:var(--mute);font-size:13px;margin-top:2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:6px 18px 12px}
+.chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+.chip:focus-visible,.mk:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:0;min-height:70vh}
+#stage{background:radial-gradient(ellipse at 50% 40%,#10294d 0%,#060d1a 75%);height:62vh;min-height:360px;overflow:hidden;position:relative}
+#side{padding:16px 18px;background:var(--panel);border-left:1px solid var(--line);overflow:auto}
+@media (max-width:760px){main{grid-template-columns:1fr}#side{border-left:0;border-top:1px solid var(--line)}#stage{height:52vh}}
+.mk{position:relative;border-radius:50%;background:#f2b441;border:0;cursor:pointer;box-shadow:0 0 0 4px #f2b44145;padding:0;pointer-events:auto}
+.mk::after{content:"";position:absolute;inset:-9px;border-radius:50%}
+.mk.on{background:#4fd1c0;box-shadow:0 0 0 6px #4fd1c040}
+.hint{color:var(--mute)}
+h2{font:600 19px/1.2 Georgia,serif;margin:0 0 4px}
+.mkt{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.mkt b{display:block;font-size:15px}
+.up{color:var(--acc)}.down{color:#d98e1f}
+ul{list-style:none;margin:0;padding:0}
+li{padding:11px 0;border-top:1px solid var(--line)}
+.tag{font-size:12px;color:var(--mute);display:block;margin-bottom:2px}
+.note{margin-top:14px;font-size:12px;color:var(--mute)}
+.ic{width:18px;height:18px;vertical-align:-4px;color:var(--acc)}
+.chip .ic{width:16px;height:16px;vertical-align:-3px}
+.chip[aria-pressed="true"] .ic{color:var(--bg)}
+h3{font:600 14px/1.3 system-ui,sans-serif;margin:16px 0 6px}
+.bar{height:6px;background:var(--chip);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc)}
+.mut{color:var(--mute);font-size:13px;margin:8px 0 0}
+.pt{margin-top:14px;padding:12px;border:1px solid var(--acc);border-radius:8px}
+.pt h3{margin-top:0}
+.pt li{padding:8px 0;font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+<h1>Globo de Notícias</h1>
+<div class="sub">Toca num ponto para ver as notícias do país; o tamanho mostra a influência no mundo.</div>
+</header>
+<div class="chips" id="chips" role="group" aria-label="Filtrar por categoria"></div>
+<main>
+<div id="stage" aria-label="Globo interativo"></div>
+<aside id="side"><p class="hint">Escolhe um país no globo para ver as notícias e os dados de mercado.</p></aside>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.33.1/dist/globe.gl.min.js"></script>
+<script>
+const I=p=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const CATS={all:["Todas",""],eco:["Economia",I('<path d="M5 20V12M12 20V5M19 20V9"/>')],fin:["Finanças",I('<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>')],mkt:["Mercados",I('<path d="M4 8h13l-3-3M20 16H7l3 3"/>')],pol:["Política",I('<path d="M6 21V4M6 5h12l-3 4 3 4H6"/>')]};
+// [país, lat, lng, moeda, índice, variação %, [[cat, título, impacto]]]
+const D=[
+["Portugal",39.5,-8,"EUR","PSI",0.4,[["eco","Governo revê em alta a previsão de crescimento",1],["fin","Banca divulga resultados trimestrais acima do esperado",1]]],
+["Estados Unidos",39,-98,"USD","S&P 500",-0.3,[["fin","Reserva Federal sinaliza cautela nos próximos cortes",-1],["mkt","Dólar recua face às principais moedas",-1],["eco","Inflação mensal em linha com as estimativas",0]]],
+["Reino Unido",54,-2,"GBP","FTSE 100",0.2,[["fin","Banco de Inglaterra mantém taxa diretora",0],["eco","Mercado de trabalho mostra sinais de abrandamento",-1]]],
+["Alemanha",51,10,"EUR","DAX",0.6,[["eco","Encomendas à indústria sobem pelo segundo mês",1],["pol","Debate orçamental domina a agenda do governo",0]]],
+["França",46.5,2.5,"EUR","CAC 40",0.1,[["fin","Grupos de luxo sob pressão na procura asiática",-1],["pol","Parlamento discute metas de défice",0]]],
+["Japão",36,138,"JPY","Nikkei 225",0.9,[["mkt","Iene volátil antes da reunião do banco central",-1],["eco","Exportações de eletrónica atingem máximo do ano",1]]],
+["China",35,103,"CNY","Shanghai Comp.",-0.5,[["eco","Produção industrial cresce menos do que o previsto",-1],["pol","Novas medidas de estímulo em análise",0]]],
+["Índia",22,79,"INR","Nifty 50",0.7,[["eco","PMI dos serviços mantém-se em expansão forte",1],["fin","Fluxos de capital estrangeiro regressam à bolsa",1]]],
+["Brasil",-14,-52,"BRL","Ibovespa",-0.2,[["fin","Banco central prepara decisão sobre juros",0],["mkt","Real sob pressão com incerteza fiscal",-1]]],
+["Canadá",56,-106,"CAD","S&P/TSX",0.3,[["eco","Preços da energia sustentam as exportações",1],["fin","Bancos reforçam provisões para crédito",-1]]],
+["Austrália",-25,134,"AUD","ASX 200",0.4,[["eco","Exportações de minério em recuperação",1],["fin","Mercado imobiliário continua a arrefecer",-1]]],
+["África do Sul",-29,24,"ZAR","JSE Top 40",-0.1,[["eco","Falhas de energia voltam a travar a indústria",-1],["mkt","Rand estável perante o dólar",0]]],
+["Emirados Árabes",24,54,"AED","ADX",0.5,[["eco","Setor não petrolífero continua a ganhar peso",1],["fin","Novos fundos soberanos anunciam investimentos",1]]]
+];
+const L=[ // continentes simplificados [lng,lat]
+[[-168,66],[-140,70],[-95,72],[-80,73],[-62,60],[-55,50],[-67,45],[-76,35],[-81,25],[-97,26],[-97,20],[-88,16],[-83,9],[-78,8],[-90,14],[-105,20],[-117,32],[-124,40],[-125,49],[-135,58],[-150,60],[-165,60]],
+[[-78,8],[-62,10],[-50,0],[-35,-6],[-40,-22],[-48,-28],[-58,-38],[-65,-42],[-68,-55],[-74,-50],[-72,-30],[-71,-18],[-80,-5],[-80,2]],
+[[-9,37],[-9,43],[-2,44],[-4,48],[2,51],[8,54],[10,57],[12,56],[18,60],[22,66],[28,71],[40,67],[60,69],[80,73],[105,78],[140,73],[170,70],[178,65],[162,58],[156,51],[140,53],[135,43],[127,39],[122,40],[121,31],[117,23],[108,21],[106,10],[100,13],[103,1],[98,8],[94,17],[88,22],[80,15],[77,8],[72,20],[67,25],[57,26],[51,24],[56,18],[44,12],[39,21],[35,28],[34,31],[36,36],[27,37],[26,40],[23,40],[22,37],[19,40],[16,38],[12,42],[8,44],[3,43],[-1,38],[-5,36]],
+[[-17,21],[-10,30],[-5,36],[10,37],[32,31],[34,28],[43,12],[51,12],[40,-3],[40,-15],[35,-24],[27,-34],[18,-34],[12,-18],[9,-1],[9,4],[-8,4],[-17,14]],
+[[114,-22],[122,-18],[136,-12],[142,-11],[146,-19],[153,-27],[150,-37],[140,-38],[130,-32],[115,-34]],
+[[-55,60],[-45,60],[-20,70],[-20,82],[-60,82],[-70,76]]
+].map(r=>({type:"Feature",geometry:{type:"Polygon",coordinates:[r.concat([r[0]])]}}));
+
+D.push(
+["Itália",42.5,12.5,"EUR","FTSE MIB",0.3,[["fin","Spread da dívida estreita face à Alemanha",1],["eco","Turismo sustenta o crescimento do trimestre",1]]],
+["Espanha",40,-3.5,"EUR","IBEX 35",0.5,[["eco","Emprego atinge máximos com forte contributo dos serviços",1],["fin","Bancos beneficiam de margens de juro elevadas",1]]],
+["Países Baixos",52.2,5.3,"EUR","AEX",0.2,[["mkt","Porto de Roterdão regista aumento do tráfego",1],["eco","Setor dos semicondutores atrai investimento",1]]],
+["Suíça",46.8,8.2,"CHF","SMI",0.1,[["fin","Franco suíço mantém estatuto de moeda refúgio",0],["eco","Exportações farmacêuticas abrandam",-1]]],
+["Rússia",61,95,"RUB","MOEX",-0.4,[["eco","Receitas da energia sob pressão",-1],["pol","Sanções continuam a condicionar o comércio externo",-1]]],
+["Turquia",39,35,"TRY","BIST 100",0.6,[["fin","Banco central mantém política monetária restritiva",0],["mkt","Lira continua sob pressão cambial",-1]]],
+["Arábia Saudita",24,45,"SAR","Tadawul",0.2,[["eco","Produção de petróleo em debate na OPEP+",0],["fin","Fundo soberano acelera investimentos no estrangeiro",1]]],
+["Coreia do Sul",36.5,127.8,"KRW","KOSPI",0.8,[["eco","Exportações de chips sobem pelo quinto mês",1],["mkt","Won recupera face ao dólar",1]]],
+["Taiwan",23.7,121,"TWD","TAIEX",0.7,[["eco","Procura por semicondutores avançados mantém-se forte",1],["pol","Tensões regionais seguidas de perto pelos mercados",-1]]],
+["Indonésia",-2.5,118,"IDR","IDX Composite",0.1,[["eco","Exportações de níquel apoiam a balança comercial",1],["fin","Banco central intervém para estabilizar a rupia",-1]]],
+["México",23.5,-102,"MXN","S&P/BMV IPC",0.3,[["eco","Investimento industrial cresce com a relocalização de fábricas",1],["mkt","Peso mexicano estável face ao dólar",0]]],
+["Argentina",-35,-65,"ARS","Merval",-0.6,[["eco","Inflação mensal continua em desaceleração",1],["fin","Reservas do banco central em foco",-1]]],
+["Singapura",1.35,103.8,"SGD","STI",0.2,[["fin","Setor financeiro reforça o papel de centro regional",1],["mkt","Comércio marítimo regista novo pico",1]]],
+["Nigéria",9,8,"NGN","NGX All-Share",0.3,[["eco","Reformas cambiais atraem investidores",1],["mkt","Naira volátil nos mercados oficiais",-1]]],
+["Egito",26.5,30,"EGP","EGX 30",0.4,[["fin","Acordos de financiamento externo em negociação",0],["eco","Receitas do Canal de Suez em recuperação",1]]]
+);
+// [peso aprox. no PIB mundial %, influência]
+const INF={
+"Portugal":[0.25,"Economia pequena e aberta, ligada à zona euro, com peso simbólico no Atlântico e nos países de língua portuguesa."],
+"Estados Unidos":[26,"Maior economia e emissor da principal moeda de reserva: as decisões da Fed movem todos os mercados."],
+"Reino Unido":[3.3,"Um dos maiores centros financeiros do mundo, com Londres como praça de câmbios e seguros."],
+"Alemanha":[4.5,"Motor industrial da Europa; o seu ritmo condiciona a zona euro e as cadeias de fornecimento."],
+"França":[2.8,"Segunda maior economia da zona euro, forte em luxo, aeronáutica e energia."],
+"Japão":[4,"Grande credor mundial; o iene e os juros japoneses influenciam os fluxos globais de capital."],
+"China":[17,"Fábrica do mundo e maior parceiro comercial de dezenas de países; define o preço de muitas matérias-primas."],
+"Índia":[3.5,"Economia grande de crescimento mais rápido, com peso crescente em serviços e tecnologia."],
+"Brasil":[2,"Grande exportador de alimentos e minérios e líder económico da América Latina."],
+"Canadá":[2,"Fornecedor-chave de energia e recursos para os EUA, com um sistema bancário sólido."],
+"Austrália":[1.5,"Grande exportador de minério e gás, muito exposto à procura da China."],
+"África do Sul":[0.35,"Economia mais industrializada de África e grande produtora de metais preciosos."],
+"Emirados Árabes":[0.4,"Centro de comércio, finanças e logística entre a Europa, a Ásia e África."],
+"Itália":[2,"Terceira economia da zona euro; a sua dívida pública é um foco de atenção dos mercados."],
+"Espanha":[1.4,"Grande parceiro comercial de Portugal e peça importante da zona euro em turismo e energia."],
+"Países Baixos":[0.9,"Porta de entrada de mercadorias na Europa e sede de empresas-chave de tecnologia."],
+"Suíça":[0.8,"Centro de gestão de fortunas e refúgio financeiro em alturas de incerteza."],
+"Rússia":[2,"Grande exportador de energia e cereais; o seu isolamento financeiro reconfigura o comércio mundial."],
+"Turquia":[1,"Ponte entre a Europa e a Ásia, com economia sensível à inflação e ao câmbio."],
+"Arábia Saudita":[1,"Maior exportador de petróleo; as suas decisões na OPEP+ influenciam o preço da energia."],
+"Coreia do Sul":[1.7,"Líder em memórias, baterias e automóvel, essencial nas cadeias de eletrónica."],
+"Taiwan":[0.7,"Produz a maior parte dos chips mais avançados do mundo, o que lhe dá enorme peso estratégico."],
+"Indonésia":[1.3,"Maior economia do Sudeste Asiático e grande produtora de níquel e carvão."],
+"México":[1.8,"Principal parceiro comercial dos EUA e destino de fábricas deslocalizadas da Ásia."],
+"Argentina":[0.5,"Grande produtora agrícola, com histórico de crises de dívida e inflação."],
+"Singapura":[0.4,"Principal centro financeiro e portuário do Sudeste Asiático."],
+"Nigéria":[0.4,"Maior economia da África subsariana e grande produtora de petróleo."],
+"Egito":[0.4,"Controla o Canal de Suez, por onde passa uma parte importante do comércio marítimo."]
+};
+const pt=()=>`<div class="pt"><h3>Portugal em foco</h3><ul>
+<li><b>Zona euro:</b> sem moeda própria, segue as decisões de juros do BCE.</li>
+<li><b>Motores:</b> turismo, exportações de bens (automóvel, componentes, têxtil) e energias renováveis.</li>
+<li><b>Ligações:</b> Espanha e Alemanha como grandes clientes, laços com Brasil, Angola e Reino Unido, e o porto de Sines como porta atlântica.</li>
+<li><b>Riscos:</b> dívida pública ainda elevada, dependência do turismo e pressão no preço da habitação.</li></ul></div>`;
+const infl=c=>{const [w,t]=INF[c[0]];return `<h3>Influência no mundo</h3><div class="bar"><i style="width:${Math.max(4,Math.sqrt(w/26)*100)}%"></i></div><p class="mut">Cerca de ${String(w).replace(".",",")}% do PIB mundial (aprox.). ${t}</p>`+(c[0]==="Portugal"?bp()+pt():"")};
+let cat="all",sel=null,g=null;
+const $=id=>document.getElementById(id);
+const stage=$("stage"),side=$("side");
+
+function items(c){return c[6].filter(n=>cat==="all"||n[0]===cat)}
+function visible(){return cat==="all"?D:D.filter(c=>items(c).length)}
+
+function drawChips(){
+  $("chips").innerHTML="";
+  Object.entries(CATS).forEach(([k,v])=>{
+    const b=document.createElement("button");
+    b.className="chip";b.innerHTML=(v[1]?v[1]+" ":"")+v[0];
+    b.setAttribute("aria-pressed",k===cat);
+    b.onclick=()=>{cat=k;drawChips();refresh();if(sel&&!items(sel).length)sel=null;drawSide()};
+    $("chips").appendChild(b);
+  });
+}
+
+function drawSide(){
+  if(!sel){side.innerHTML='<p class="hint">Escolhe um país no globo para ver as notícias e os dados de mercado.</p>';return}
+  const ch=sel[5],cls=ch>=0?"up":"down",sg=ch>=0?"+":"";
+  side.innerHTML=`<h2>${sel[0]}</h2>
+  <div class="mkt"><span>Moeda<b>${sel[3]}</b></span><span>Índice<b>${sel[4]}</b></span></div>
+  ${newsList(sel)}
+  ${infl(sel)}<p class="note">Atualizado: ${UPD}. Textos de influência e análise de Portugal são de exemplo.</p>`;
+}
+
+function pick(c){
+  sel=c;g.controls().autoRotate=false;
+  g.pointOfView({lat:c[1],lng:c[2],altitude:1.7},900);
+  refresh();drawSide();
+}
+
+function refresh(){
+  g.htmlElementsData(visible());
+}
+
+function init(){
+  g=Globe()(stage)
+    .backgroundColor("rgba(0,0,0,0)")
+    .showAtmosphere(true).atmosphereColor("#4fd1c0").atmosphereAltitude(0.15)
+    .showGraticules(true)
+    .polygonsData(L).polygonCapColor(()=>"#1f6b5c").polygonSideColor(()=>"rgba(0,0,0,0)").polygonStrokeColor(()=>"#2f9a85").polygonAltitude(0.008)
+    .htmlLat(d=>d[1]).htmlLng(d=>d[2]).htmlAltitude(0.01)
+    .htmlElement(d=>{
+      const b=document.createElement("button");
+      const s=Math.round(12+Math.sqrt(INF[d[0]][0])*3);b.style.width=b.style.height=s+"px";
+      b.className="mk"+(sel===d?" on":"");if(!d[6].length)b.style.opacity=.45;
+      b.title=d[0];b.setAttribute("aria-label",d[0]);
+      b.onclick=()=>pick(d);
+      return b;
+    });
+  g.globeMaterial().color.set("#0b1d3a");
+  const c=g.controls();c.autoRotate=true;c.autoRotateSpeed=0.5;
+  g.pointOfView({lat:30,lng:-10,altitude:2.4});
+  const fit=()=>g.width(stage.clientWidth).height(stage.clientHeight);
+  fit();new ResizeObserver(fit).observe(stage);
+  refresh();
+}
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+let UPD="sem dados",PTS=[];
+const ago=iso=>{if(!iso)return"";const m=Math.round((Date.now()-new Date(iso))/6e4);return m<60?`há ${Math.max(m,1)} min`:m<1440?`há ${Math.round(m/60)} h`:`há ${Math.round(m/1440)} d`};
+const newsList=c=>{const it=items(c);if(!it.length)return'<p class="hint">Sem notícias recentes das fontes configuradas.</p>';
+ return"<ul>"+it.map(n=>`<li><span class="tag">${CATS[n[0]][1]} ${CATS[n[0]][0]} · ${esc(n[4])} · ${ago(n[5])}</span><a href="${/^https?:\/\//.test(n[3])?esc(n[3]):"#"}" target="_blank" rel="noopener noreferrer">${esc(n[1])}</a></li>`).join("")+"</ul>"};
+const bp=()=>PTS.length?`<div class="pt"><h3>Banco de Portugal (BPstat)</h3><ul>${PTS.map(s=>`<li><b>${esc(s.label)}:</b> ${esc(String(s.value).replace(".",","))}${s.period?" ("+esc(s.period)+")":""}</li>`).join("")}</ul></div>`:"";
+function apply(J){
+  UPD=J&&J.updated?new Date(J.updated).toLocaleString("pt-PT",{dateStyle:"short",timeStyle:"short"}):"sem dados";
+  PTS=(J&&J.portugal)||[];
+  D.forEach(c=>{c[6]=((J&&J.countries&&J.countries[c[0]])||[]).map(n=>[n.cat,n.title,0,n.url,n.source,n.date])});
+}
+drawChips();
+fetch("noticias.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null).then(J=>{apply(J);start()});
+function start(){try{init()}catch(e){stage.innerHTML='<p style="color:#fff;padding:20px">Não foi possível carregar o globo.</p>'}}
+</script>
+</body>
+</html>
