@@ -52,6 +52,13 @@ li a.cn{color:var(--acc);font-size:12px;font-weight:700}
 .mk{position:relative;border-radius:50%;background:#f2b441;border:0;cursor:pointer;box-shadow:0 0 0 4px #f2b44145;padding:0;pointer-events:auto}
 .mk::after{content:"";position:absolute;inset:-9px;border-radius:50%}
 .mk.on{background:#4fd1c0;box-shadow:0 0 0 6px #4fd1c040}
+.px{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:2px 0 4px}.px i{font-size:13px;font-weight:700;font-style:normal;margin-left:6px}
+.chart{width:100%;height:120px;display:block}
+.ax{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin:2px 0 8px}
+.tr{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--mute)}.tr i{font-style:normal;font-weight:700}.tr b{color:var(--ink)}
+.per{display:flex;gap:4px}.pill{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;font:inherit;font-size:11px;font-weight:700;padding:2px 9px;cursor:pointer}
+.pill[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#06201c}
+.card .hd{align-items:center}.card .hd h3{margin:0}
 @media (max-width:820px){
  .brand span,.search input{display:none}.search input:focus{display:block;position:fixed;left:12px;right:12px;top:10px;width:auto;z-index:9}
  #stage{right:0;bottom:44vh}
@@ -187,7 +194,7 @@ const MKT={
 "Nigéria":["O NGX All-Share tem bancos, telecomunicações e cimento, e é sensível ao câmbio e à inflação.","Naira, petróleo e política monetária."],
 "Egito":["O EGX 30 junta bancos, imobiliário e indústria, sensível à libra egípcia e à inflação.","Libra egípcia, financiamento externo e Canal de Suez."]
 };
-let cat="all",sel=null,g=null,W=null,FX={},FXD="",FXL=false,UPD="sem dados",PTS=[];
+let cat="all",sel=null,g=null,W=null,FX={},FXD="",LAY="off",IDX={},PER=63,hov=null,UPD="sem dados",PTS=[];
 const $=id=>document.getElementById(id),stage=$("stage"),side=$("side");
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const fmt=(x,d)=>x.toFixed(d).replace(".",",");
@@ -195,15 +202,41 @@ const nrm=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 const ago=iso=>{if(!iso)return"";const m=Math.round((Date.now()-new Date(iso))/6e4);return m<60?`há ${Math.max(m,1)} min`:m<1440?`há ${Math.round(m/60)} h`:`há ${Math.round(m/1440)} d`};
 const NM={"Portugal":"Portugal","Estados Unidos":"United States of America","Reino Unido":"United Kingdom","Alemanha":"Germany","França":"France","Japão":"Japan","China":"China","Índia":"India","Brasil":"Brazil","Canadá":"Canada","Austrália":"Australia","África do Sul":"South Africa","Emirados Árabes":"United Arab Emirates","Itália":"Italy","Espanha":"Spain","Países Baixos":"Netherlands","Suíça":"Switzerland","Rússia":"Russia","Turquia":"Turkey","Arábia Saudita":"Saudi Arabia","Coreia do Sul":"South Korea","Taiwan":"Taiwan","Indonésia":"Indonesia","México":"Mexico","Argentina":"Argentina","Singapura":"Singapore","Nigéria":"Nigeria","Egito":"Egypt"};
 const byEN={};
+// novos países: [nome, lat, lng, moeda, índice, peso PIB mundial % (aprox.), nome no mapa, influência, perfil do mercado, a acompanhar]
+[["Polónia",52,19,"PLN","WIG20",0.9,"Poland","Maior economia da Europa de Leste dentro da UE, com indústria e serviços em expansão.","O WIG20 reúne grandes bancos, energia e retalho, com muito peso do setor financeiro.","Banco central, zloty e fundos europeus."],
+["Suécia",62,15,"SEK","OMXS30",0.55,"Sweden","Economia aberta e inovadora, com grandes exportadoras industriais e tecnológicas.","O OMXS30 pesa em industriais, bancos e empresas de tecnologia exportadoras.","Riksbank, coroa sueca e imobiliário."],
+["Noruega",61,9,"NOK","OSEBX",0.4,"Norway","Grande exportadora de petróleo e gás, com o maior fundo soberano do mundo.","A bolsa de Oslo é muito ligada à energia, ao mar (pesca, aquacultura) e à banca.","Preço do petróleo e do gás, coroa norueguesa."],
+["Dinamarca",56,10,"DKK","OMXC25",0.35,"Denmark","Pequena economia com peso global na saúde e no transporte marítimo.","O OMXC25 é muito influenciado por farmacêuticas e transporte marítimo.","Setor farmacêutico, fretes e juros."],
+["Irlanda",53,-8,"EUR","ISEQ",0.5,"Ireland","Sede europeia de muitas multinacionais de tecnologia e farmacêuticas.","O ISEQ tem poucos grandes nomes, ligados a materiais de construção, aviação e finanças.","Fiscalidade das multinacionais e BCE."],
+["Bélgica",50.6,4.7,"EUR","BEL 20",0.55,"Belgium","Sede de instituições da UE e centro de comércio e logística.","O BEL 20 junta cervejeiras, financeiras, farmacêuticas e utilities.","BCE, consumo e resultados bancários."],
+["Áustria",47.5,14.5,"EUR","ATX",0.45,"Austria","Economia industrial e exportadora ligada à Alemanha e à Europa Central.","O ATX é pequeno, com bancos, energia e industriais.","Bancos com negócio no Leste europeu e preços da energia."],
+["Grécia",39,22,"EUR","Athex",0.2,"Greece","Economia assente em turismo e transporte marítimo, em recuperação após a crise da dívida.","A bolsa de Atenas tem forte presença de bancos, que dominam a recuperação do índice.","Bancos, turismo e rating da dívida."],
+["Israel",31.5,35,"ILS","TA-125",0.5,"Israel","Polo de tecnologia, cibersegurança e defesa.","O TA-125 tem bancos, tecnologia e imobiliário, e reage a eventos geopolíticos.","Tensões regionais, banco central e shekel."],
+["Hong Kong",22.3,114.2,"HKD","Hang Seng",0.35,"Hong Kong","Porta financeira entre a China e o resto do mundo.","O Hang Seng pesa em bancos, tecnologia chinesa, seguradoras e imobiliário.","Economia da China, juros dos EUA e regulação."],
+["Tailândia",15,101,"THB","SET",0.5,"Thailand","Economia exportadora e turística do Sudeste Asiático.","A SET tem energia, bancos, retalho e turismo.","Turismo, exportações e banco central."],
+["Malásia",4.2,102,"MYR","KLCI",0.4,"Malaysia","Exportadora de eletrónica, óleo de palma e energia.","O KLCI junta bancos, utilities, plantações e telecomunicações.","Preço do óleo de palma e petróleo, e ringgit."],
+["Vietname",16,106,"VND","VN-Index",0.4,"Vietnam","Polo de produção em crescimento, com cadeias de fornecimento da eletrónica.","O VN-Index é dominado por bancos, imobiliário e investidores particulares.","Exportações, crédito e imobiliário."],
+["Filipinas",12.5,122,"PHP","PSEi",0.4,"Philippines","Economia de consumo apoiada em remessas e serviços.","O PSEi pesa em imobiliário, bancos, holdings e telecomunicações.","Remessas, inflação e peso filipino."],
+["Chile",-33,-71,"CLP","IPSA",0.3,"Chile","Maior produtor mundial de cobre e importante exportador de lítio.","O IPSA junta retalho, bancos, energia e mineração.","Preço do cobre, peso chileno e política interna."],
+["Colômbia",4.5,-73,"COP","COLCAP",0.35,"Colombia","Exportadora de petróleo, carvão e café.","O COLCAP é concentrado em energia, bancos e holdings.","Petróleo, peso colombiano e política fiscal."],
+["Peru",-10,-75,"PEN","S&P/BVL",0.2,"Peru","Grande produtor de cobre, ouro e prata.","A bolsa de Lima é pequena e muito ligada à mineração e aos bancos.","Preço dos metais e política interna."],
+["Marrocos",32,-6,"MAD","MASI",0.15,"Morocco","Hub industrial e exportador para a Europa, com fosfatos e automóvel.","A bolsa de Casablanca tem bancos, telecomunicações e construção.","Fosfatos, turismo e ligação à economia europeia."],
+["Quénia",0.5,38,"KES","NSE 20",0.1,"Kenya","Centro financeiro e tecnológico da África Oriental.","A NSE tem bancos e telecomunicações, com forte peso do pagamento móvel.","Xelim, inflação e dívida pública."],
+["Paquistão",30,70,"PKR","KSE-100",0.3,"Pakistan","Grande população e economia dependente de financiamento externo.","O KSE-100 pesa em energia, bancos e cimento.","Acordos com o FMI, rupia e inflação."],
+["Qatar",25.3,51.2,"QAR","QE Index",0.2,"Qatar","Grande exportador de gás natural liquefeito.","A bolsa do Qatar é dominada por bancos e energia.","Preço do gás natural e investimentos do fundo soberano."],
+["Nova Zelândia",-41,174,"NZD","NZX 50",0.2,"New Zealand","Exportadora agrícola (lacticínios, carne) e turismo.","O NZX 50 tem utilities, saúde, telecomunicações e infraestruturas.","Preços dos lacticínios, banco central e China."]
+].forEach(r=>{D.push([r[0],r[1],r[2],r[3],r[4],0,[]]);INF[r[0]]=[r[5],r[7]];MKT[r[0]]=[r[8],r[9]];NM[r[0]]=r[6]});
 const items=c=>c[6].filter(n=>cat==="all"||n[0]===cat);
 const visible=()=>cat==="all"?D:D.filter(c=>items(c).length);
+const chg=v=>v==null?"—":`<i class="${v>=0?"up":"down"}">${v>=0?"▲":"▼"}${fmt(Math.abs(v),2)}%</i>`;
 const capColor=f=>{
   if(!f.properties)return"#1f6b5c";
   const c=byEN[f.properties.name];
   if(!c)return"#16414f";
-  if(FXL){const x=FX[c[3]];if(x&&c[3]!=="EUR"){const v=-x.chg;if(v>0.02)return"#4fd1c0";if(v<-0.02)return"#f2b441"}return"#2a6f66"}
-  return sel===c?"#4fd1c0":"#2a8a77"};
-const leg=()=>{$("leg").innerHTML=FXL?`<span style="color:#4fd1c0">■</span> moeda valorizou face ao euro · <span style="color:#f2b441">■</span> desvalorizou · variação diária, referência BCE${FXD?" de "+FXD:""}. Zona euro e moedas sem referência ficam neutras.`:""};
+  if(LAY==="fx"){const x=FX[c[3]];if(x&&c[3]!=="EUR"){const v=-x.chg;if(v>0.02)return"#4fd1c0";if(v<-0.02)return"#f2b441"}return"#2a6f66"}
+  if(LAY==="idx"){const x=IDX[c[0]],v=x&&x.chg?x.chg["1d"]:null;if(v!=null){if(v>0.05)return"#4fd1c0";if(v<-0.05)return"#f2b441"}return"#2a6f66"}
+  return sel===c?"#4fd1c0":hov===f?"#37a893":"#2a8a77"};
+const leg=()=>{$("leg").innerHTML=LAY==="fx"?`<span style="color:#4fd1c0">■</span> moeda valorizou face ao euro · <span style="color:#f2b441">■</span> desvalorizou · variação diária, referência BCE${FXD?" de "+FXD:""}.`:LAY==="idx"?'<span style="color:#4fd1c0">■</span> índice em alta na última sessão · <span style="color:#f2b441">■</span> em baixa · cinzento: sem dados.':""};
 const fxSpan=c=>{const eur=c[3]==="EUR",f=FX[eur?"USD":c[3]];
   if(!f)return'<span>Câmbio BCE<b>sem referência</b></span>';
   const ch=eur?f.chg:-f.chg;
@@ -213,13 +246,31 @@ const link=n=>`<a href="${/^https?:\/\//.test(n[3])?esc(n[3]):"#"}" target="_bla
 const newsList=c=>{const it=items(c);return it.length?"<ul>"+it.map(n=>`<li>${tag(n)}${link(n)}</li>`).join("")+"</ul>":'<p class="hint">Sem notícias recentes das fontes configuradas.</p>'};
 const bp=()=>PTS.length?`<div class="pt"><h3>Banco de Portugal (BPstat)</h3><ul>${PTS.map(s=>`<li><b>${esc(s.label)}:</b> ${esc(String(s.value).replace(".",","))}${s.period?" ("+esc(s.period)+")":""}</li>`).join("")}</ul></div>`:"";
 
+function chartCard(c){
+  const x=IDX[c[0]];
+  if(!x||!x.v||x.v.length<5)return`<div class="card"><h3>Índice · ${esc(c[4])}</h3><p class="mut">Sem dados de gráfico para este índice na última atualização.</p></div>`;
+  const n=Math.min(PER,x.v.length),v=x.v.slice(-n),d=x.d.slice(-n),lo=Math.min(...v),hi=Math.max(...v),w=320,h=120,p=6;
+  const X=i=>p+i*(w-2*p)/(v.length-1),Y=y=>h-p-(y-lo)/((hi-lo)||1)*(h-2*p);
+  const pts=v.map((y,i)=>X(i).toFixed(1)+","+Y(y).toFixed(1)).join(" "),col=v[v.length-1]>=v[0]?"var(--acc)":"var(--amb)";
+  const per=[[21,"1M"],[63,"3M"],[126,"6M"]].map(([k,l])=>`<button class="pill" data-p="${k}" aria-pressed="${k===PER}">${l}</button>`).join("");
+  const T={alta:"Alta",baixa:"Baixa",lateral:"Lateral"}[x.trend]||"—";
+  return`<div class="card"><div class="hd"><h3>${esc(c[4])}</h3><div class="per">${per}</div></div>
+  <div class="px">${x.last.toLocaleString("pt-PT",{maximumFractionDigits:2})}${chg(x.chg["1d"])}</div>
+  <svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Evolução do índice ${esc(c[4])}"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><polygon points="${X(0)},${h} ${pts} ${X(v.length-1)},${h}" fill="url(#gr)"/><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+  <div class="ax"><span>${d[0]}</span><span>mín ${lo.toLocaleString("pt-PT",{maximumFractionDigits:0})} · máx ${hi.toLocaleString("pt-PT",{maximumFractionDigits:0})}</span><span>${d[d.length-1]}</span></div>
+  <div class="tr">${[["1 sem","1w"],["1 mês","1m"],["3 meses","3m"]].map(([l,k])=>`<span>${l} ${chg(x.chg[k])}</span>`).join("")}<span>Tendência <b>${T}</b></span></div>
+  <p class="mut">Fecho diário. Tendência: média de 20 dias face à de 50. Fonte: Yahoo Finance (não oficial).</p></div>`}
 function home(){
   const all=[];D.forEach(c=>items(c).forEach(n=>all.push([c,n])));
   all.sort((a,b)=>(b[1][5]||"").localeCompare(a[1][5]||""));
   const nC=D.filter(c=>items(c).length).length;
+  const mv=Object.entries(IDX).filter(([k,x])=>x.chg&&x.chg["1d"]!=null).map(([k,x])=>[k,x.chg["1d"],D.find(c=>c[0]===k)]).filter(a=>a[2]).sort((a,b)=>b[1]-a[1]);
+  const row=([k,v,c])=>`<li><a class="cn" href="#" data-c="${esc(k)}">${esc(k)}</a> <span class="mut">${esc(c[4])}</span> ${chg(v)}</li>`;
   side.innerHTML=`<h2>Em destaque</h2><p class="mut">${all.length} notícias de ${nC} países · atualizado ${UPD}</p>`+
+   (mv.length>=6?`<h3>Bolsas na última sessão</h3><ul>${mv.slice(0,3).map(row).join("")}${mv.slice(-3).reverse().map(row).join("")}</ul>`:"")+
+   `<h3>Últimas notícias</h3>`+
    (all.length?"<ul>"+all.slice(0,12).map(([c,n])=>`<li>${tag(n)}<a class="cn" href="#" data-c="${esc(c[0])}">${esc(c[0])}</a><br>${link(n)}</li>`).join("")+"</ul>":'<p class="hint">Ainda sem notícias. Escolhe um país no globo ou corre o workflow no GitHub.</p>')+
-   '<p class="note">Toca num ponto do globo, ou procura um país em cima, para ver notícias, mercado e influência.</p>';
+   '<p class="note">Toca num país no globo, ou procura-o em cima, para ver mercado, notícias e influência.</p>';
 }
 function drawSide(){
   side.scrollTop=0;
@@ -227,6 +278,7 @@ function drawSide(){
   const m=MKT[sel[0]]||["",""];
   side.innerHTML=`<div class="hd"><h2>${sel[0]}</h2><button class="ib" data-x aria-label="Fechar">✕</button></div>
   <div class="mkt"><span>Moeda<b>${sel[3]}</b></span><span>Índice<b>${sel[4]}</b></span>${fxSpan(sel)}</div>
+  ${chartCard(sel)}
   <h3>Notícias</h3>${newsList(sel)}
   <div class="card"><h3>Mercado de ações · ${sel[4]}</h3><p>${m[0]}</p><p class="mut"><b>A acompanhar:</b> ${m[1]}</p></div>
   ${infl(sel)}
@@ -234,6 +286,7 @@ function drawSide(){
 }
 side.onclick=e=>{
   const b=e.target.closest("[data-c]");if(b){e.preventDefault();return pick(D.find(c=>c[0]===b.dataset.c))}
+  const q=e.target.closest("[data-p]");if(q){PER=+q.dataset.p;const st=side.scrollTop;drawSide();side.scrollTop=st;return}
   if(e.target.closest("[data-x]")){sel=null;if(g){g.controls().autoRotate=true;refresh()}drawSide()}
 };
 function drawChips(){
@@ -245,24 +298,29 @@ function drawChips(){
     b.onclick=()=>{cat=k;drawChips();refresh();if(sel&&!items(sel).length)sel=null;drawSide()};
     $("chips").appendChild(b);
   });
-  const t=document.createElement("button");
-  t.className="chip";t.innerHTML=I('<path d="M4 8h13l-3-3M20 16H7l3 3"/>')+" Câmbios BCE";
-  t.setAttribute("aria-pressed",FXL);t.title="Colorir os países pela variação diária da moeda face ao euro";
-  t.onclick=()=>{FXL=!FXL;drawChips();if(g)g.polygonCapColor(capColor);leg()};
-  $("chips").appendChild(t);
+  [["fx","Câmbios BCE",'<path d="M4 8h13l-3-3M20 16H7l3 3"/>',"Colorir os países pela variação diária da moeda face ao euro"],["idx","Bolsas (dia)",'<path d="M4 18l5-6 4 3 7-9"/>',"Colorir os países pela variação do índice na última sessão"]].forEach(([k,l,ic,tt])=>{
+    const t=document.createElement("button");
+    t.className="chip";t.innerHTML=I(ic)+" "+l;t.title=tt;t.setAttribute("aria-pressed",LAY===k);
+    t.onclick=()=>{LAY=LAY===k?"off":k;drawChips();if(g)g.polygonCapColor(capColor);leg()};
+    $("chips").appendChild(t);
+  });
 }
 function pick(c){
   sel=c;g.controls().autoRotate=false;
   g.pointOfView({lat:c[1],lng:c[2],altitude:1.7},900);
   refresh();drawSide();
 }
-function refresh(){g.htmlElementsData(visible());g.polygonCapColor(capColor)}
+function refresh(){g.htmlElementsData(visible());g.ringsData(visible().filter(c=>c[6].length));g.polygonCapColor(capColor)}
 function init(){
   g=Globe()(stage)
     .backgroundColor("rgba(0,0,0,0)")
     .showAtmosphere(true).atmosphereColor("#4fd1c0").atmosphereAltitude(0.15)
     .showGraticules(true)
     .polygonsData(W||L).polygonCapColor(capColor).polygonSideColor(()=>"rgba(0,0,0,0)").polygonStrokeColor(()=>"#0b1d3a").polygonAltitude(0.006)
+    .polygonLabel(f=>{const c=f.properties&&byEN[f.properties.name];return`<div style="font:600 12px Manrope,sans-serif;padding:3px 8px;border-radius:6px;background:#0b1d3aee;color:#e8eef5">${esc(c?c[0]:(f.properties?f.properties.name:""))}${c?" · "+c[6].length+" notícias":""}</div>`})
+    .onPolygonHover(f=>{hov=f;g.polygonCapColor(capColor);stage.style.cursor=f&&f.properties&&byEN[f.properties.name]?"pointer":"grab"})
+    .onPolygonClick(f=>{const c=f&&f.properties&&byEN[f.properties.name];if(c)pick(c)})
+    .ringLat(d=>d[1]).ringLng(d=>d[2]).ringColor(()=>t=>`rgba(242,180,65,${(1-t)*.55})`).ringMaxRadius(2.4).ringPropagationSpeed(1.1).ringRepeatPeriod(2400)
     .htmlLat(d=>d[1]).htmlLng(d=>d[2]).htmlAltitude(0.01)
     .htmlElement(d=>{
       const b=document.createElement("button");
@@ -281,7 +339,7 @@ function init(){
 }
 function apply(J){
   UPD=J&&J.updated?new Date(J.updated).toLocaleString("pt-PT",{dateStyle:"short",timeStyle:"short"}):"sem dados";
-  PTS=(J&&J.portugal)||[];FX=(J&&J.fx)||{};FXD=(Object.values(FX)[0]||{}).date||"";
+  PTS=(J&&J.portugal)||[];FX=(J&&J.fx)||{};IDX=(J&&J.idx)||{};FXD=(Object.values(FX)[0]||{}).date||"";
   D.forEach(c=>{byEN[NM[c[0]]]=c;c[6]=((J&&J.countries&&J.countries[c[0]])||[]).map(n=>[n.cat,n.title,0,n.url,n.source,n.date])});
   $("fx").innerHTML=["USD","GBP","JPY","CHF","CNY","BRL"].filter(k=>FX[k]).map(k=>{const f=FX[k];return`<span>EUR/${k} <b>${fmt(f.rate,k==="JPY"?2:4)}</b> <i class="${f.chg>=0?"up":"down"}">${f.chg>=0?"▲":"▼"}${fmt(Math.abs(f.chg),2)}%</i></span>`}).join("");
 }
