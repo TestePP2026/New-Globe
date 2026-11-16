@@ -194,6 +194,7 @@ const MKT={
 "Nigéria":["O NGX All-Share tem bancos, telecomunicações e cimento, e é sensível ao câmbio e à inflação.","Naira, petróleo e política monetária."],
 "Egito":["O EGX 30 junta bancos, imobiliário e indústria, sensível à libra egípcia e à inflação.","Libra egípcia, financiamento externo e Canal de Suez."]
 };
+const LITE=(typeof navigator!=="undefined"&&(navigator.hardwareConcurrency||8)<=4)||innerWidth<820;
 let cat="all",sel=null,g=null,W=null,FX={},FXD="",LAY="off",IDX={},PER=63,hov=null,UPD="sem dados",PTS=[];
 const $=id=>document.getElementById(id),stage=$("stage"),side=$("side");
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -312,7 +313,6 @@ function pick(c){
 }
 function refresh(){g.htmlElementsData(visible());g.ringsData(LITE?[]:sel?[sel]:D.filter(c=>c[6].length).sort((a,b)=>b[6].length-a[6].length).slice(0,8));g.polygonCapColor(capColor)}
 function init(){
-  const LITE=(typeof navigator!=="undefined"&&(navigator.hardwareConcurrency||8)<=4)||innerWidth<820;
   g=Globe({rendererConfig:{antialias:false,powerPreference:"high-performance"}})(stage)
     .backgroundColor("rgba(0,0,0,0)")
     .showAtmosphere(true).atmosphereColor("#4fd1c0").atmosphereAltitude(0.15)
@@ -356,7 +356,7 @@ $("q").oninput=e=>{const c=D.find(c=>nrm(c[0])===nrm(e.target.value.trim()));if(
 const jf=u=>fetch(u,{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);
 drawChips();
 Promise.all([jf("noticias.json"),jf("countries.json")]).then(([J,G])=>{W=G&&G.features?G.features:null;apply(J);start()});
-function start(){try{init()}catch(e){stage.innerHTML='<p style="color:#fff;padding:20px">Não foi possível carregar o globo.</p>'}drawSide()}
+function start(){try{init()}catch(e){stage.innerHTML='<p style="color:#fff;padding:20px">Não foi possível carregar o globo ('+esc(e.message)+').</p>'}drawSide()}
 </script>
 </body>
 </html>
