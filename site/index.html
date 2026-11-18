@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Globo de Notícias</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='8'%20fill='%230b1d3a'/%3E%3Cg%20fill='none'%20stroke='%234fd1c0'%20stroke-width='2'%20stroke-linecap='round'%3E%3Ccircle%20cx='16'%20cy='16'%20r='9'/%3E%3Cellipse%20cx='16'%20cy='16'%20rx='4'%20ry='9'/%3E%3Cpath%20d='M7%2016h18'/%3E%3C/g%3E%3Ccircle%20cx='23.5'%20cy='8.5'%20r='3'%20fill='%23f2b441'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#0a1220">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -14,7 +16,7 @@ html,body{height:100%;margin:0}
 body{font:14px/1.55 Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);overflow:hidden;font-variant-numeric:tabular-nums}
 .top{position:fixed;inset:0 0 auto 0;height:var(--h);padding:env(safe-area-inset-top,0px) 16px 0;display:flex;align-items:center;gap:16px;z-index:5;background:var(--glass);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
-.brand svg{width:22px;height:22px;color:var(--acc)}
+.brand .logo{width:30px;height:30px;color:var(--acc);flex:none}
 .brand span{font-weight:500;color:var(--mute)}
 .search input{width:190px;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:7px 14px;color:var(--ink);font:inherit;outline:0}
 .search input:focus{border-color:var(--acc)}
@@ -71,7 +73,7 @@ li a.cn{color:var(--acc);font-size:12px;font-weight:700}
 </head>
 <body>
 <header class="top">
-<div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Globo <span>de Notícias</span></div>
+<div class="brand"><svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="16" cy="16" r="10"/><ellipse cx="16" cy="16" rx="4.5" ry="10"/><path d="M6 16h20"/></g><circle cx="24" cy="7.5" r="3.4" fill="#f2b441"/></svg>Globo <span>de Notícias</span></div>
 <div class="search"><input id="q" list="cl" placeholder="Procurar país…" aria-label="Procurar país" autocomplete="off"><datalist id="cl"></datalist></div>
 <div class="fx" id="fx" aria-label="Câmbios BCE"></div>
 <button class="ib" id="th" aria-label="Alternar tema claro/escuro">◐</button>
@@ -271,7 +273,7 @@ function home(){
    (mv.length>=6?`<h3>Bolsas na última sessão</h3><ul>${mv.slice(0,3).map(row).join("")}${mv.slice(-3).reverse().map(row).join("")}</ul>`:"")+
    `<h3>Últimas notícias</h3>`+
    (all.length?"<ul>"+all.slice(0,12).map(([c,n])=>`<li>${tag(n)}<a class="cn" href="#" data-c="${esc(c[0])}">${esc(c[0])}</a><br>${link(n)}</li>`).join("")+"</ul>":'<p class="hint">Ainda sem notícias. Escolhe um país no globo ou corre o workflow no GitHub.</p>')+
-   '<p class="note">Toca num país no globo, ou procura-o em cima, para ver mercado, notícias e influência.</p>';
+   '<p class="note">Toca num país no globo, ou procura-o em cima, para ver mercado, notícias e influência. (versão 3)</p>';
 }
 function drawSide(){
   side.scrollTop=0;
@@ -312,16 +314,16 @@ function pick(c){
   refresh();drawSide();
 }
 function refresh(){g.htmlElementsData(visible());g.ringsData(LITE?[]:sel?[sel]:D.filter(c=>c[6].length).sort((a,b)=>b[6].length-a[6].length).slice(0,8));g.polygonCapColor(capColor)}
+const okR=r=>r.length>=4&&Math.abs(r.reduce((a,p,i)=>{const q=r[(i+1)%r.length];return a+p[0]*q[1]-q[0]*p[1]},0))>1e-6;
+const cleanMap=fs=>fs.map(f=>{const gm=f.geometry,P=(gm.type==="Polygon"?[gm.coordinates]:gm.coordinates).filter(p=>p&&p[0]&&okR(p[0]));return P.length?{type:"Feature",properties:f.properties,geometry:{type:"MultiPolygon",coordinates:P}}:null}).filter(Boolean);
+const safe=(n,f)=>{try{f()}catch(e){console.warn("globo:",n,e)}};
 function init(){
-  g=Globe({rendererConfig:{antialias:false,powerPreference:"high-performance"}})(stage)
+  let mk0;try{mk0=Globe({rendererConfig:{antialias:false,alpha:true,powerPreference:"high-performance"}})}catch(e){mk0=Globe()}
+  let polys=L;if(W){try{const c=cleanMap(W);if(c.length>20)polys=c}catch(e){console.warn("mapa:",e)}}
+  g=mk0(stage)
     .backgroundColor("rgba(0,0,0,0)")
     .showAtmosphere(true).atmosphereColor("#4fd1c0").atmosphereAltitude(0.15)
-    .polygonsTransitionDuration(0)
-    .polygonsData(W||L).polygonCapColor(capColor).polygonSideColor(()=>"rgba(0,0,0,0)").polygonAltitude(0.004)
-    .polygonLabel(f=>{const c=f.properties&&byEN[f.properties.name];return`<div style="font:600 12px Manrope,sans-serif;padding:3px 8px;border-radius:6px;background:#0b1d3aee;color:#e8eef5">${esc(c?c[0]:(f.properties?f.properties.name:""))}${c?" · "+c[6].length+" notícias":""}</div>`})
-    .onPolygonHover(f=>{hov=f;stage.style.cursor=f&&f.properties&&byEN[f.properties.name]?"pointer":"grab"})
-    .onPolygonClick(f=>{const c=f&&f.properties&&byEN[f.properties.name];if(c)pick(c)})
-    .ringLat(d=>d[1]).ringLng(d=>d[2]).ringColor(()=>t=>`rgba(242,180,65,${(1-t)*.55})`).ringMaxRadius(2.4).ringPropagationSpeed(1.1).ringRepeatPeriod(2400)
+    .polygonsData(polys).polygonCapColor(capColor).polygonSideColor(()=>"rgba(0,0,0,0)").polygonAltitude(0.004)
     .htmlLat(d=>d[1]).htmlLng(d=>d[2]).htmlAltitude(0.01)
     .htmlElement(d=>{
       const b=document.createElement("button");
@@ -331,15 +333,19 @@ function init(){
       b.onclick=()=>pick(d);
       return b;
     });
-  g.globeMaterial().color.set("#0b1d3a");
-  g.renderer().setPixelRatio(Math.min(window.devicePixelRatio||1,LITE?1:1.5));
-  if(g.htmlTransitionDuration)g.htmlTransitionDuration(0);
-  document.addEventListener("visibilitychange",()=>{if(document.hidden)g.pauseAnimation();else g.resumeAnimation()});
-  const c=g.controls();c.autoRotate=true;c.autoRotateSpeed=0.5;
-  g.pointOfView({lat:30,lng:-10,altitude:2.3});
+  safe("transições",()=>{g.polygonsTransitionDuration(0);if(g.htmlTransitionDuration)g.htmlTransitionDuration(0)});
+  safe("hover",()=>g.polygonLabel(f=>{const c=f.properties&&byEN[f.properties.name];return`<div style="font:600 12px Manrope,sans-serif;padding:3px 8px;border-radius:6px;background:#0b1d3aee;color:#e8eef5">${esc(c?c[0]:(f.properties?f.properties.name:""))}${c?" · "+c[6].length+" notícias":""}</div>`})
+    .onPolygonHover(f=>{hov=f;stage.style.cursor=f&&f.properties&&byEN[f.properties.name]?"pointer":"grab"})
+    .onPolygonClick(f=>{const c=f&&f.properties&&byEN[f.properties.name];if(c)pick(c)}));
+  safe("pulsos",()=>g.ringLat(d=>d[1]).ringLng(d=>d[2]).ringColor(()=>t=>`rgba(242,180,65,${(1-t)*.55})`).ringMaxRadius(2.4).ringPropagationSpeed(1.1).ringRepeatPeriod(2400));
+  safe("cor do globo",()=>g.globeMaterial().color.set("#0b1d3a"));
+  safe("resolução",()=>g.renderer().setPixelRatio(Math.min(window.devicePixelRatio||1,LITE?1:1.5)));
+  safe("pausa",()=>document.addEventListener("visibilitychange",()=>{if(document.hidden)g.pauseAnimation();else g.resumeAnimation()}));
+  safe("rotação",()=>{const c=g.controls();c.autoRotate=true;c.autoRotateSpeed=0.5});
+  safe("câmara",()=>g.pointOfView({lat:30,lng:-10,altitude:2.3}));
   const fit=()=>g.width(stage.clientWidth).height(stage.clientHeight);
-  fit();new ResizeObserver(fit).observe(stage);
-  refresh();
+  fit();safe("redimensionar",()=>new ResizeObserver(fit).observe(stage));
+  safe("camadas",refresh);
 }
 function apply(J){
   UPD=J&&J.updated?new Date(J.updated).toLocaleString("pt-PT",{dateStyle:"short",timeStyle:"short"}):"sem dados";
