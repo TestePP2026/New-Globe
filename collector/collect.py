@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Recolector do Globo de Notícias: lê RSS + API do Banco de Portugal e escreve site/noticias.json.
 Só biblioteca standard do Python (sem pip). Uma fonte que falhe não estraga as outras."""
-import json, re, sys, time, unicodedata, urllib.parse, urllib.request
+import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
 from urllib.parse import urlencode
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -180,23 +180,60 @@ def summarize_index(ts, closes):
     return {"last": round(v[-1], 2), "chg": {"1d": ch(1), "1w": ch(5), "1m": ch(21), "3m": ch(63)}, "trend": trend,
             "d": [p[0] for p in pts], "v": [round(x, 2) for x in v]}
 
-def collect_indices(fetch=get, sleep=time.sleep):
-    """Histórico diário (6 meses) dos índices via Yahoo Finance (API não oficial, sem chave). Falhas isoladas por índice."""
-    out, log, fails = {}, [], []
+# Plano B (opcional): Stooq, com chave gratuita obtida uma vez no site (stooq.com/q/d/?s=spy.us&get_apikey) e guardada
+# no GitHub como segredo STOOQ_API_KEY. Símbolos não verificados; os que falharem ficam sem gráfico.
+STOOQ = {"Estados Unidos": "^spx", "Reino Unido": "^ukx", "Alemanha": "^dax", "França": "^cac", "Japão": "^nkx", "China": "^shc", "Hong Kong": "^hsi",
+         "Espanha": "^ibex", "Países Baixos": "^aex", "Suíça": "^smi", "Itália": "^fmib", "Polónia": "^wig20", "Brasil": "^bvp",
+         "Coreia do Sul": "^kospi", "Austrália": "^aor", "Portugal": "^psi20"}
+
+def err_text(e):
+    code = getattr(e, "code", None)
+    return f"HTTP {code}" if code else (str(e)[:80] or type(e).__name__)
+
+def fetch_yahoo(sym, fetch):
+    last = None
+    for host in ("query1", "query2"):
+        try:
+            url = "https://%s.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1d" % (host, urllib.parse.quote(sym))
+            r = json.loads(fetch(url, headers=BROWSER_UA))["chart"]["result"][0]
+            return summarize_index(r["timestamp"], r["indicators"]["quote"][0]["close"])
+        except Exception as e:
+            last = e
+    raise last
+
+def fetch_stooq(sym, key, fetch):
+    txt = fetch("https://stooq.com/q/d/l/?" + urlencode({"s": sym, "i": "d", "apikey": key}), headers=BROWSER_UA).decode("utf-8", "ignore")
+    rows = [l.split(",") for l in txt.strip().splitlines()[1:]]
+    rows = [r for r in rows if len(r) >= 5 and r[4] not in ("", "null")]
+    if len(rows) < 10: raise ValueError("Stooq sem dados (chave em falta ou inválida)")
+    ts = [int(datetime.strptime(r[0], "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) for r in rows]
+    return summarize_index(ts, [float(r[4]) for r in rows])
+
+def collect_indices(fetch=get, sleep=time.sleep, stooq_key=None):
+    """Histórico diário (6 meses) dos índices: Yahoo Finance (API não oficial) e, se houver chave, Stooq como plano B."""
+    key = stooq_key if stooq_key is not None else os.environ.get("STOOQ_API_KEY", "")
+    out, fails, first_err, streak, yahoo_dead = {}, [], None, 0, False
     for country, sym in INDICES.items():
-        if not sym: continue
-        url = "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1d" % urllib.parse.quote(sym)
-        for attempt in (1, 2):
+        data = None
+        if sym and not yahoo_dead:
             try:
-                r = json.loads(fetch(url, headers=BROWSER_UA))["chart"]["result"][0]
-                out[country] = dict(summarize_index(r["timestamp"], r["indicators"]["quote"][0]["close"]), sym=sym)
-                break
+                data = dict(fetch_yahoo(sym, fetch), sym=sym, fonte="Yahoo Finance"); streak = 0
             except Exception as e:
-                if attempt == 2: fails.append(f"{sym} ({e})")
-                else: sleep(5)
-        sleep(1)
-    log.append(f"Índices: {len(out)} com dados" + (f"; falharam: {', '.join(fails[:8])}" if fails else ""))
-    return out, log
+                first_err = first_err or err_text(e); streak += 1
+                if streak >= 5 and not out: yahoo_dead = True
+            sleep(0.7)
+        if data is None and key and country in STOOQ:
+            try:
+                data = dict(fetch_stooq(STOOQ[country], key, fetch), sym=STOOQ[country], fonte="Stooq"); sleep(0.7)
+            except Exception as e:
+                first_err = first_err or "Stooq: " + err_text(e)
+        if data: out[country] = data
+        elif sym or country in STOOQ: fails.append(country)
+    total = sum(1 for c, v in INDICES.items() if v or (key and c in STOOQ))
+    status = {"ok": len(out), "total": total, "error": first_err, "yahoo_bloqueado": yahoo_dead}
+    log = [f"Índices: {len(out)}/{total} com dados" + (f"; primeiro erro: {first_err}" if first_err else "") +
+           ("; Yahoo bloqueado, a usar só Stooq" if yahoo_dead and key else "; Yahoo bloqueado (sem chave Stooq)" if yahoo_dead else "")]
+    return out, log, status
 
 def collect_fx(fetch=get):
     """Câmbios de referência do BCE (moeda por 1 EUR) e variação face ao dia anterior, em %."""
@@ -247,10 +284,10 @@ def main(path="site/noticias.json"):
         fx = collect_fx(); l3 = [f"BCE: {len(fx)} moedas"]
     except Exception as e:
         fx, l3 = {}, [f"AVISO BCE: {e}"]
-    idx, l4 = collect_indices()
+    idx, l4, idx_status = collect_indices()
     print("\n".join(l1 + l2 + l3 + l4))
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"updated": datetime.now(timezone.utc).isoformat(timespec="minutes"), "countries": news, "portugal": bp, "fx": fx, "idx": idx},
+        json.dump({"updated": datetime.now(timezone.utc).isoformat(timespec="minutes"), "countries": news, "portugal": bp, "fx": fx, "idx": idx, "idx_status": idx_status},
                   f, ensure_ascii=False, indent=1)
 
 if __name__ == "__main__":
